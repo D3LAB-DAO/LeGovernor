@@ -2,27 +2,27 @@
 
 pragma solidity ^0.8.0;
 
-interface IGovernanceToken {
-    function getPriorVotes(address account, uint256 blockNumber) external view returns (uint96 votes);
-}
-
 abstract contract EventLeGovernor {
     /// @notice An event emitted when a new proposal is created
-    event ProposalCreated(uint id, address proposer, uint startBlock, uint endBlock, string description);
+    event ProposalCreated(uint256 id, address proposer, uint256 issues, uint256 startBlock, uint256 endBlock, string description);
+
+    /// @notice An event emitted when a vote has been cast on a proposal
+    /// @param voter The address which casted a vote
+    /// @param proposalId The proposal id which was voted on
+    /// @param votes Number of total votes which were cast by the voter
+    /// @param reason The reason given for the vote by the voter
+    event VoteCast(address indexed voter, uint256 proposalId, uint256 votes, string reason);
 }
 
-abstract contract ILeGovernor is EventLeGovernor {
-    /// @notice The address of the governance token
-    IGovernanceToken public rights;
-
+abstract contract ILeGovernorHub is EventLeGovernor {
     /// @notice The delay before voting on a proposal may take place, once proposed, in blocks
-    uint public votingDelay;
+    uint256 public votingDelay;
 
     /// @notice The duration of voting on a proposal, in blocks
-    uint public votingPeriod;
+    uint256 public votingPeriod;
 
     /// @notice The total number of proposals
-    uint public proposalCount;
+    uint256 public proposalCount;
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint256 => Proposal) public proposals;
@@ -48,6 +48,9 @@ abstract contract ILeGovernor is EventLeGovernor {
         /// @notice Unique id for looking up a proposal
         uint256 id;
 
+        /// @notice The address of `leyerExecute`
+        address lego;
+
         /// @notice Creator of the proposal
         address proposer;
 
@@ -63,17 +66,20 @@ abstract contract ILeGovernor is EventLeGovernor {
         /// @notice The block at which voting ends: votes must be cast prior to this block
         uint256 endBlock;
 
-        /// @notice Current number of votes: indexed to issues
-        uint[] votes;
+        /// @notice Array of each vote: all issues, against, abstain
+        int256[] votes;
+
+        /// @notice Cumulated amount of all votes
+        uint256 cumulatedVotes;
 
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
 
-        /// @notice Flag marking whether the proposal has been finalized for aggregating
-        bool finalized;
-
         /// @notice Flag marking whether the proposal has been executed
         bool executed;
+
+        /// @notice Flag marking whether the proposal has been finalized for aggregating
+        bool finalized;
 
         /// @notice Receipts of ballots for the entire set of voters
         mapping (address => Receipt) receipts;
@@ -84,11 +90,8 @@ abstract contract ILeGovernor is EventLeGovernor {
         /// @notice Whether or not a vote has been cast
         bool hasVoted;
 
-        /// @notice Whether or not the voter supports the proposal or abstains
-        uint8 support;
-
-        /// @notice The number of votes the voter had, which were cast
-        uint96 votes;
+        /// @notice Array of each vote: all issues, against, abstain
+        int256[] votes;
     }
 
     /// @notice Possible states that a proposal may be in
