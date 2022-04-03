@@ -12,17 +12,36 @@ abstract contract EventLeGovernor {
     /// @param votes Number of total votes which were cast by the voter
     /// @param reason The reason given for the vote by the voter
     event VoteCast(address indexed voter, uint256 proposalId, uint256 votes, string reason);
+
+    /// @notice An event emitted when a proposal has been queued in the Timelock
+    event ProposalQueued(uint id, uint eta);
+
+    /// @notice An event emitted when a proposal has been executed in the Timelock
+    event ProposalExecuted(uint id);
+
+    /// @notice An event emitted when a proposal has been canceled
+    event ProposalCanceled(uint id);
 }
 
 abstract contract ILeGovernorHub is EventLeGovernor {
+
     /// @notice The delay before voting on a proposal may take place, once proposed, in blocks
     uint256 public votingDelay;
 
     /// @notice The duration of voting on a proposal, in blocks
     uint256 public votingPeriod;
 
+
+
+
+
     /// @notice The total number of proposals
     uint256 public proposalCount;
+
+
+
+
+
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint256 => Proposal) public proposals;

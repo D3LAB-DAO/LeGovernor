@@ -10,13 +10,9 @@ import "./interfaces/ILeGovernorHub.sol";
 
 /// @dev Compound compatibility
 contract LeGovernorHub is ILeGovernorHub, Ownable {
+
     /// @notice The name of this contract
     string public constant name = "LeGovernor Hub";
-
-    /* Hyperparams */
-
-    /// @notice The maximum number of actions that can be included in a proposal
-    uint256 public constant proposalMaxOperations = 10; // 10 actions
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
@@ -24,13 +20,22 @@ contract LeGovernorHub is ILeGovernorHub, Ownable {
     /// @notice The EIP-712 typehash for the ballot struct used by the contract
     bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,uint256[] votes)");
 
-    /* admin */
-    // TODO
+
+
+    /* Hyperparams */
+
+    /// @notice The maximum number of actions that can be included in a proposal
+    uint256 public constant proposalMaxOperations = 10; // 10 actions
+
+
 
     // TODO
     function initialize() public {
 
     }
+
+
+    // ================================================= Participates =================================================
 
     /**
      *
@@ -58,7 +63,7 @@ contract LeGovernorHub is ILeGovernorHub, Ownable {
             string[] memory signatures = issues_[i].signatures;
             bytes[] memory calldatas = issues_[i].calldatas;
 
-            require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorBravo::propose: proposal function information arity mismatch");
+            require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "LeGovernorHub::propose: proposal function information arity mismatch");
             require(targets.length != 0, "LeGovernorHub::propose: must provide actions");
             require(targets.length <= proposalMaxOperations, "LeGovernorHub::propose: too many actions");
 
@@ -68,8 +73,8 @@ contract LeGovernorHub is ILeGovernorHub, Ownable {
         uint256 latestProposalId = latestProposalIds[msgSender];
         if (latestProposalId != 0) {
             ProposalState proposersLatestProposalState = state(latestProposalId);
-            require(proposersLatestProposalState != ProposalState.Active, "GovernorBravo::propose: one live proposal per proposer, found an already active proposal");
-            require(proposersLatestProposalState != ProposalState.Pending, "GovernorBravo::propose: one live proposal per proposer, found an already pending proposal");
+            require(proposersLatestProposalState != ProposalState.Active, "LeGovernorHub::propose: one live proposal per proposer, found an already active proposal");
+            require(proposersLatestProposalState != ProposalState.Pending, "LeGovernorHub::propose: one live proposal per proposer, found an already pending proposal");
         }
 
         uint256 startBlock = block.number + votingDelay;
@@ -89,9 +94,11 @@ contract LeGovernorHub is ILeGovernorHub, Ownable {
         // return pid;
     }
 
-    function state(uint256 proposalId) public view returns (ProposalState) {
 
-    }
+
+
+
+    // ==================================================== Votes =====================================================
 
     /**
      * @notice Cast a vote for a proposal
@@ -155,5 +162,60 @@ contract LeGovernorHub is ILeGovernorHub, Ownable {
 
         receipt.hasVoted = true;
         receipt.votes = votes;
+    }
+
+
+
+    // ================================================== Aggregates ==================================================
+
+
+
+
+
+    
+    // =================================================== Executes ===================================================
+
+    /**
+     * @notice Queues a proposal of state succeeded
+     * @param proposalId The id of the proposal to queue
+     */
+    function queue(uint256 proposalId) external {
+        require(state(proposalId) == ProposalState.Succeeded, "LeGovernorHub::queue: proposal can only be queued if it is succeeded");
+        Proposal storage proposal = proposals[proposalId];
+        (bool succeed, uint256 eta) = ILayerExecute(proposal.lego).queue(proposalId);
+        require(succeed, "LeGovernorHub::queue: fail to queue");
+        emit ProposalQueued(proposalId, eta);
+    }
+
+    /**
+     * @notice Executes a queued proposal if eta has passed
+     * @param proposalId The id of the proposal to execute
+     */
+    function execute(uint256 proposalId) external payable {
+        require(state(proposalId) == ProposalState.Queued, "LeGovernorHub::execute: proposal can only be executed if it is queued");
+        Proposal storage proposal = proposals[proposalId];
+        proposal.executed = true;
+        require(ILayerExecute(proposal.lego).execute(proposalId), "LeGovernorHub::execute: fail to execute");
+        emit ProposalExecuted(proposalId);
+    }
+
+    /**
+     * @notice Cancels a proposal
+     * @param proposalId The id of the proposal to cancel
+     */
+    function cancel(uint256 proposalId) external {
+        require(state(proposalId) != ProposalState.Executed, "LeGovernorHub::cancel: cannot cancel executed proposal");
+        Proposal storage proposal = proposals[proposalId];
+        proposal.canceled = true;
+        require(ILayerExecute(proposal.lego).cancel(proposalId), "LeGovernorHub::execute: fail to cancle");
+        emit ProposalCanceled(proposalId);
+    }
+
+
+    // ================================================================================================================
+
+
+
+    function state(uint256 proposalId) public view returns (ProposalState) {
     }
 }
